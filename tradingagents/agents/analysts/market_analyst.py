@@ -6,9 +6,9 @@ import json
 def create_market_analyst(llm, toolkit):
 
     def market_analyst_node(state):
-        current_date = state["trade_date"]
+        start_date = state["start_date"]
+        end_date = state["end_date"]
         ticker = state["company_of_interest"]
-        company_name = state["company_of_interest"]
 
         if toolkit.config["online_tools"]:
             tools = [
@@ -61,7 +61,7 @@ Volume-Based Indicators:
                     " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
                     " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
                     " You have access to the following tools: {tool_names}.\n{system_message}"
-                    "For your reference, the current date is {current_date}. The company we want to look at is {ticker}",
+                    "For your reference, the analysis period is from {start_date} to {end_date}. The company we want to look at is {ticker}",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
@@ -69,7 +69,8 @@ Volume-Based Indicators:
 
         prompt = prompt.partial(system_message=system_message)
         prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
-        prompt = prompt.partial(current_date=current_date)
+        prompt = prompt.partial(start_date=start_date)
+        prompt = prompt.partial(end_date=end_date)
         prompt = prompt.partial(ticker=ticker)
 
         chain = prompt | llm.bind_tools(tools)
