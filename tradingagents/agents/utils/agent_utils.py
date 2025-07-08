@@ -5,6 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import RemoveMessage
 from langchain_core.tools import tool
 from datetime import date, timedelta, datetime
+import requests
 import functools
 import pandas as pd
 import os
@@ -399,6 +400,25 @@ class Toolkit:
 
     @staticmethod
     @tool
+    def get_global_news_gemini(
+        start_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+        end_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+    ):
+        """
+        Retrieve the latest macroeconomics news on a given date using Google's Gemini model.
+        This is an alternative to the OpenAI news tool.
+        Args:
+            curr_date (str): Current date in yyyy-mm-dd format
+        Returns:
+            str: A formatted string containing the latest macroeconomic news on the given date.
+        """
+        gemini_news_results = interface.get_global_news_gemini(start_date, end_date)
+
+        return gemini_news_results
+
+
+    @staticmethod
+    @tool
     def get_fundamentals_openai(
         ticker: Annotated[str, "the company's ticker"],
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
@@ -417,3 +437,71 @@ class Toolkit:
         )
 
         return openai_fundamentals_results
+
+    @staticmethod
+    @tool
+    def get_fundamentals_gemini(
+        ticker: Annotated[str, "the company's ticker"],
+        end_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+    ):
+        """
+        Retrieve the latest fundamental information about a given stock on a given date by using OpenAI's news API.
+        Args:
+            ticker (str): Ticker of a company. e.g. AAPL, TSM
+            curr_date (str): Current date in yyyy-mm-dd format
+        Returns:
+            str: A formatted string containing the latest fundamental information about the company on the given date.
+        """
+        result = interface.get_fundamentals_news_gemini(
+            ticker, end_date
+        )
+        return result 
+
+    @staticmethod
+    @tool
+    def get_marketstack_news(
+        ticker: Annotated[str, "Ticker of a company. e.g. AAPL, TSM"],
+        start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
+        end_date: Annotated[str, "End date in yyyy-mm-dd format"],
+    ) -> str:
+        """
+        Retrieve the latest news about a given stock from MarketStack within a date range.
+        This tool is an alternative to get_finnhub_news.
+        Args:
+            ticker (str): Ticker of a company. e.g. AAPL, TSM
+            start_date (str): Start date in yyyy-mm-dd format
+            end_date (str): End date in yyyy-mm-dd format
+        Returns:
+            str: A formatted dataframe containing news about the company within the date range from start_date to end_date.
+        """
+        api_key = Toolkit._config.get("MARKETSTACK_API_KEY")
+        if not api_key:
+            return "Error: MARKETSTACK_API_KEY not found in configuration."
+
+        params = {
+            'access_key': api_key,
+            'symbols': ticker,
+            'date_from': start_date,
+            'date_to': end_date,
+            'sort': 'published_desc',
+            'limit': 50
+        }
+        
+        try:
+            response = requests.get('https://api.marketstack.com/v2/news', params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if 'data' not in data or not data['data']:
+                return f"No news found for ticker {ticker} from {start_date} to {end_date}."
+
+            df = pd.DataFrame(data['data'])
+            df = df[['published_at', 'title', 'source', 'description']]
+            df['published_at'] = pd.to_datetime(df['published_at']).dt.strftime('%Y-%m-%d %H:%M')
+            
+            return df.to_markdown(index=False)
+
+        except requests.exceptions.RequestException as e:
+            return f"An error occurred while fetching data from MarketStack: {e}"
+        except Exception as e:
+            return f"An unexpected error occurred: {e}"

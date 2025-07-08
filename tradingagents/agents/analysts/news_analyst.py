@@ -9,17 +9,11 @@ def create_news_analyst(llm, toolkit):
         end_date = state["end_date"]
         ticker = state["company_of_interest"]
 
-        if toolkit.config["online_tools"]:
-            tools = [toolkit.get_global_news_openai, toolkit.get_google_news]
-        else:
-            tools = [
-                toolkit.get_finnhub_news,
-                toolkit.get_reddit_news,
-                toolkit.get_google_news,
-            ]
+        tools = [toolkit.get_marketstack_news]
+        tools.append(toolkit.get_global_news_gemini)
 
         system_message = (
-            "You are a news researcher tasked with analyzing recent news and trends over the specified period. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Look at news from EODHD, and finnhub to be comprehensive. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."
+            "You are a news researcher tasked with analyzing recent news and trends over the specified period. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use your available tools, including web search and specific news APIs (like Finnhub and MarketStack), to be comprehensive. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."
             + """ Make sure to append a Makrdown table at the end of the report to organize key points in the report, organized and easy to read."""
         )
 

@@ -14,6 +14,8 @@ from tqdm import tqdm
 import yfinance as yf
 from openai import OpenAI
 from .config import get_config, set_config, DATA_DIR
+from langchain_google_genai import ChatGoogleGenerativeAI
+from google.ai.generativelanguage_v1beta.types import Tool as GenAITool
 
 
 def get_finnhub_news(
@@ -805,3 +807,22 @@ def get_fundamentals_openai(ticker, curr_date):
     )
 
     return response.output[1].content[0].text
+
+def get_fundamentals_news_gemini(ticker, end_date):
+
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        temperature=1,
+        max_output_tokens=4096 * 4,
+        top_p=1,
+        )
+
+    response = llm.invoke(f"Search Fundamental for discussions on ticker symbol '{ticker}' during a month before {end_date} to {end_date}. Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc", tools=[GenAITool(google_search={})])
+    return response.content
+
+def get_global_news_gemini(start_date, end_date):
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+    query = f"Search global or macroeconomics news from 7 days before {start_date} to {end_date} that would be informative for trading purposes? Make sure you only get the data posted during that period."
+
+    response = llm.invoke(query, tools=[GenAITool(google_search={})])
+    return response.content
