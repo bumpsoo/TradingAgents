@@ -68,60 +68,6 @@ class Toolkit:
 
     @staticmethod
     @tool
-    def get_finnhub_news(
-        ticker: Annotated[
-            str,
-            "Search query of a company, e.g. 'AAPL, TSM, etc.",
-        ],
-        start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
-        end_date: Annotated[str, "End date in yyyy-mm-dd format"],
-    ):
-        """
-        Retrieve the latest news about a given stock from Finnhub within a date range
-        Args:
-            ticker (str): Ticker of a company. e.g. AAPL, TSM
-            start_date (str): Start date in yyyy-mm-dd format
-            end_date (str): End date in yyyy-mm-dd format
-        Returns:
-            str: A formatted dataframe containing news about the company within the date range from start_date to end_date
-        """
-
-        end_date_str = end_date
-
-        end_date = datetime.strptime(end_date, "%Y-%m-%d")
-        start_date = datetime.strptime(start_date, "%Y-%m-%d")
-        look_back_days = (end_date - start_date).days
-
-        finnhub_news_result = interface.get_finnhub_news(
-            ticker, end_date_str, look_back_days
-        )
-
-        return finnhub_news_result
-
-    @staticmethod
-    @tool
-    def get_reddit_stock_info(
-        ticker: Annotated[
-            str,
-            "Ticker of a company. e.g. AAPL, TSM",
-        ],
-        curr_date: Annotated[str, "Current date you want to get news for"],
-    ) -> str:
-        """
-        Retrieve the latest news about a given stock from Reddit, given the current date.
-        Args:
-            ticker (str): Ticker of a company. e.g. AAPL, TSM
-            curr_date (str): current date in yyyy-mm-dd format to get news for
-        Returns:
-            str: A formatted dataframe containing the latest news about the company on the given date
-        """
-
-        stock_news_results = interface.get_reddit_company_news(ticker, curr_date, 7, 5)
-
-        return stock_news_results
-
-    @staticmethod
-    @tool
     def get_YFin_data(
         symbol: Annotated[str, "ticker symbol of the company"],
         start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
@@ -442,18 +388,20 @@ class Toolkit:
     @tool
     def get_fundamentals_gemini(
         ticker: Annotated[str, "the company's ticker"],
-        end_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+        start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
+        end_date: Annotated[str, "End date in yyyy-mm-dd format"],
     ):
         """
         Retrieve the latest fundamental information about a given stock on a given date by using OpenAI's news API.
         Args:
             ticker (str): Ticker of a company. e.g. AAPL, TSM
-            curr_date (str): Current date in yyyy-mm-dd format
+            start_date (str): Start date in yyyy-mm-dd format
+            end_date (str): End date in yyyy-mm-dd format
         Returns:
             str: A formatted string containing the latest fundamental information about the company on the given date.
         """
         result = interface.get_fundamentals_news_gemini(
-            ticker, end_date
+            ticker, start_date, end_date
         )
         return result 
 
@@ -474,34 +422,28 @@ class Toolkit:
         Returns:
             str: A formatted dataframe containing news about the company within the date range from start_date to end_date.
         """
-        api_key = Toolkit._config.get("MARKETSTACK_API_KEY")
+        api_key = os.getenv("MARKETSTACK_API_KEY")
         if not api_key:
-            return "Error: MARKETSTACK_API_KEY not found in configuration."
+            raise ValueError("MARKETSTACK_API_KEY not found in configuration.")
 
         params = {
-            'access_key': api_key,
-            'symbols': ticker,
-            'date_from': start_date,
-            'date_to': end_date,
-            'sort': 'published_desc',
-            'limit': 50
+            "access_key": api_key,
+            "symbols": ticker,
+            "date_from": start_date,
+            "date_to": end_date,
+            "sort": "published_desc",
+            "limit": 50,
         }
-        
-        try:
-            response = requests.get('https://api.marketstack.com/v2/news', params=params)
-            response.raise_for_status()
-            data = response.json()
 
-            if 'data' not in data or not data['data']:
-                return f"No news found for ticker {ticker} from {start_date} to {end_date}."
+        response = requests.get("https://api.marketstack.com/v2/news", params=params)
+        response.raise_for_status()
+        data = response.json()
 
-            df = pd.DataFrame(data['data'])
-            df = df[['published_at', 'title', 'source', 'description']]
-            df['published_at'] = pd.to_datetime(df['published_at']).dt.strftime('%Y-%m-%d %H:%M')
-            
-            return df.to_markdown(index=False)
+        if "data" not in data or not data["data"]:
+            return f"No news found for ticker {ticker} from {start_date} to {end_date}."
 
-        except requests.exceptions.RequestException as e:
-            return f"An error occurred while fetching data from MarketStack: {e}"
-        except Exception as e:
-            return f"An unexpected error occurred: {e}"
+        df = pd.DataFrame(data["data"])
+        df = df[["published_at", "title", "source", "description"]]
+        df["published_at"] = pd.to_datetime(df["published_at"]).dt.strftime("%Y-%m-%d %H:%M")
+
+        return df.to_markdown(index=False)
